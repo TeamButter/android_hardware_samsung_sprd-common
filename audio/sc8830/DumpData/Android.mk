@@ -1,16 +1,18 @@
+#LIBDUMPDATA
 LOCAL_PATH:= $(call my-dir)
 
 include $(CLEAR_VARS)
 
 LOCAL_PRELINK_MODULE := false
 
-LOCAL_LDLIBS := \
+LOCAL_LDLIBS += \
 	-Idl
 
 #LOCAL_CFLAGS += -DENG_API_LOG
 
 LOCAL_C_INCLUDES := \
-	external/expat/lib
+	$(LOCAL_PATH) \
+	external/expat/lib 
 
 LOCAL_EXPORT_C_INCLUDE_DIRS := \
 	$(LOCAL_PATH) \
@@ -25,8 +27,11 @@ LOCAL_SHARED_LIBRARIES := \
 	libexpat \
 	libdl \
 
-LOCAL_MODULE := libdumpdata
+LOCAL_MODULE:= libdumpdata
 
 LOCAL_MODULE_TAGS := optional
 
 include $(BUILD_SHARED_LIBRARY)
+
+
+

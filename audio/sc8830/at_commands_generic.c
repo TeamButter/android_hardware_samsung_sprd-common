@@ -1,9 +1,3 @@
-#ifdef USE_LIBATCHANNEL_WRAPPER
-#include <AtChannelWrapper.h>
-#else
-#include <AtChannel.h>
-#endif /* USE_LIBATCHANNEL_WRAPPER */
-
 #define VOICECALL_VOLUME_MAX_UI	6
 #define AT_RESPONSE_LEN 1024
 
@@ -16,10 +10,51 @@ enum {
      USERCASE_BIT = 5,
      EXTRAVOLUME_BIT = 6,
      BTSAMPLE_BIT = 7,
-     MAX_BIT = 8,
+     SPPCMDUMP_BIT=8,
+     MAX_BIT = 9,
 };
 static pthread_mutex_t  ATlock = PTHREAD_MUTEX_INITIALIZER;         //eng cannot handle many at commands once
 static int at_cmd_routeDev(struct tiny_audio_device *adev,char* route,T_AT_CMD* at);
+
+typedef const char *(*send_at_func_t)(int modem_id, int sim_id, const char *at_cmd);
+static send_at_func_t send_at;
+
+static send_at_func_t find_send_at()
+{
+    send_at_func_t result = 0;
+    void *handle;
+    char *error;
+    ALOGD("%s", __FUNCTION__);
+    if ((handle = dlopen("libatchannel.so", RTLD_NOW))) {
+        dlerror(); /* clear any previous errors */
+        result = (send_at_func_t) dlsym(handle, "sendAt");
+        if ((error = (char *) dlerror())) {
+            result = 0;
+            dlclose(handle);
+            ALOGE("Cannot find '%s' function. Error: %s", "sendAt", error);
+        }
+    } else {
+        ALOGE("Cannot load: %s. Error: %s", "libatchannel.so", dlerror());
+    }
+    return result;
+}
+
+static size_t send_at_wrapper(void *buf, size_t buf_len, int sim_id, const char* at_cmd)
+{
+    ALOGI("at_cmd=[%s]", at_cmd);
+    if (!send_at)
+        send_at = find_send_at();
+    if (send_at) {
+        const int modem_id = 0; /* XXX Is 0 for w modem, 1 for other modem? */
+        const char *resp = send_at(modem_id, sim_id, at_cmd);
+        size_t outLen = MIN(buf_len, strlen(resp) + 1);
+        memcpy(buf, resp, outLen);
+        return outLen;
+    } else {
+        ALOGE("'send_at' is not initilized!");
+        }
+    return 0;
+}
 
 int do_cmd_dual(int modemId, int simId, struct tiny_audio_device *adev)
 {
@@ -58,7 +93,7 @@ int do_cmd_dual(int modemId, int simId, struct tiny_audio_device *adev)
         ALOGD("do_cmd_dual Switch incall AT command [%d][%d][%s][%d] ", modemId,simId,&(process_at_cmd.at_cmd[cmd_bit]),cmd_bit);
         adev->routeDev = at_cmd_routeDev(adev,&(process_at_cmd.at_cmd[cmd_bit]),&process_at_cmd);
         char resp[AT_RESPONSE_LEN] = { 0 };
-        int ret = sendAt(resp, AT_RESPONSE_LEN, simId, &(process_at_cmd.at_cmd[cmd_bit]));
+        int ret = send_at_wrapper(resp, AT_RESPONSE_LEN, simId, &(process_at_cmd.at_cmd[cmd_bit]));
         ALOGD("do_cmd_dual Switch incall AT command [%d][%s][%s] ", ret, &(process_at_cmd.at_cmd[cmd_bit]), resp);
     }
     return 0;
@@ -120,7 +155,6 @@ static void push_route_command(char *at_cmd,int bit,int out){
     voice_command_signal(s_adev,at_cmd,bit);
     ALOGE("push_route_command: X,at_cmd:%s,bit:%d,postcmd:%s",at_cmd,bit,&(s_adev->at_cmd_vectors->at_cmd[bit]));
 }
-
 // 0x80 stands for 8KHz(NB) sampling rate BT Headset.
 // 0x40 stands for 16KHz(WB) sampling rate BT Headset.
 static int config_bt_dev_type(int bt_headset_type, cp_type_t cp_type, int cp_sim_id,struct tiny_audio_device *adev)
@@ -133,6 +167,14 @@ static int config_bt_dev_type(int bt_headset_type, cp_type_t cp_type, int cp_sim
         at_cmd = "AT+SSAM=64";
     }
     push_voice_command(at_cmd,BTSAMPLE_BIT);
+    usleep(10000);
+    return 0;
+}
+
+static int at_cmd_cp_pcm_dump(char *at_cmd)
+{
+    ALOGI("%s : at_cmd: %s",__func__,at_cmd);
+    push_voice_command(at_cmd,SPPCMDUMP_BIT);
     usleep(10000);
     return 0;
 }
@@ -256,11 +298,19 @@ int at_cmd_cp_usecase_type(audio_cp_usecase_t type)
 
 }
 
-int at_cmd_extra_volume(int enable)
+/* This function is for samsung's extra volume solution, according to cp, extraVolume has a minimum:0x1000 */
+int at_cmd_extra_volume(bool enable, int extraVolume)
 {
-    char buf[128];
-    ALOGW("%s, enable:%d", __func__, enable);
-    snprintf(buf, sizeof buf, "AT+SPAUDIOCONFIG=extravgr,%d", enable);
-    push_voice_command(buf,EXTRAVOLUME_BIT );
+    char buf[89];
+    char *at_cmd = buf;
+    if(extraVolume < 0) {
+        ALOGW("%s, wrong extraVolume(%d), set to default 0x1000 ",__func__, extraVolume);
+        extraVolume = 0x1000;
+    }
+    ALOGW("%s, enable:%d, extraVolume:0x%x ",__func__, enable, extraVolume);
+
+    snprintf(at_cmd, sizeof buf, "AT+SPAUDIOCONFIG=extravgr,%d,%d", enable, extraVolume);
+
+    push_voice_command(at_cmd,EXTRAVOLUME_BIT );
     return 0;
 }

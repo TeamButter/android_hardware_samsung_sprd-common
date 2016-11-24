@@ -28,8 +28,10 @@
 #include <eng_audio.h>
 #include <stdint.h>
 #include <cutils/log.h>
-#include <tinyalsa/asoundlib.h>
 #include <tinyalsautils.h>
+#include "aud_enha.h"
+#include "vb_effect_if.h"
+#include <tinyalsa/asoundlib.h>
 #include <string_exchange_bin.h>
 
 #include "aud_enha.h"

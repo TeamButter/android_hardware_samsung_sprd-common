@@ -1,4 +1,3 @@
-#
 # Copyright (C) 2016 The Android Open Source Project
 # Copyright (C) 2016 The CyanogenMod Project
 #
@@ -13,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 
 LOCAL_PATH := $(call my-dir)
 
@@ -39,6 +39,7 @@ LOCAL_SRC_FILES := \
 LOCAL_C_INCLUDES := \
 	external/tinyalsa/include \
 	$(LOCAL_PATH)/../ \
+	$(LOCAL_PATH)/../audio/nv_exchange \
 
 LOCAL_EXPORT_C_INCLUDE_DIRS := \
 	$(LOCAL_PATH) \
@@ -80,3 +81,4 @@ $(LOCAL_BUILT_MODULE):
 	$(hide) rm -rf $(SYMLINK)
 	$(hide) ln -sf $(VBC_EQ_FILE) $(SYMLINK)
 	$(hide) touch $@
+

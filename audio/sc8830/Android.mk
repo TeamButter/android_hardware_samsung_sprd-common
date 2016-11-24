@@ -1,6 +1,4 @@
-#
-# Copyright (C) 2016 The Android Open Source Project
-# Copyright (C) 2016 The CyanogenMod Project
+# Copyright (C) 2011 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,9 +26,18 @@ LOCAL_CFLAGS := \
 	-D_POSIX_SOURCE \
 	-Wno-multichar \
 	-g \
+	-Wno-unused-parameter
 
 ifeq ($(BOARD_USES_LINE_CALL), true)
 LOCAL_CFLAGS += -D_VOICE_CALL_VIA_LINEIN
+endif
+
+ifneq ($(filter scx35_sc9620referphone scx35_sc9620openphone scx35_sc9620openphone_zt, $(TARGET_BOARD)),)
+LOCAL_CFLAGS += -DVB_CONTROL_PARAMETER_V2
+endif
+
+ifeq ($(strip $(AUDIO_CONTROL_PARAMETER_V2)), true)
+LOCAL_CFLAGS += -DVB_CONTROL_PARAMETER_V2
 endif
 
 ifneq (,$(filter sc8830 scx15,$(TARGET_BOARD_PLATFORM)))
@@ -42,6 +49,7 @@ ifeq ($(BOARD_USES_SS_VOIP), true)
 else
 LOCAL_CFLAGS += -DVOIP_DSP_PROCESS
 endif
+
 
 LOCAL_C_INCLUDES += \
 	external/tinyalsa/include \
@@ -87,18 +95,10 @@ LOCAL_REQUIRED_MODULES := \
 	libdumpdata \
 	libhardware_legacy \
 
-ifeq ($(BOARD_USE_LIBATCHANNEL_WRAPPER),true)
-LOCAL_CFLAGS += -DUSE_LIBATCHANNEL_WRAPPER
-LOCAL_SHARED_LIBRARIES += libatchannel_wrapper
-LOCAL_REQUIRED_MODULES += libatchannel_wrapper
-else
-LOCAL_SHARED_LIBRARIES += libatchannel
-LOCAL_REQUIRED_MODULES += libatchannel
-endif
-
 LOCAL_MODULE_TAGS := optional
 
 include $(BUILD_SHARED_LIBRARY)
 
 include $(call all-makefiles-under,$(LOCAL_PATH))
 endif
+

@@ -1,4 +1,3 @@
-#
 # Copyright (C) 2016 The Android Open Source Project
 # Copyright (C) 2016 The CyanogenMod Project
 #
@@ -24,9 +23,9 @@ LOCAL_CFLAGS := \
 	-g \
 
 LOCAL_C_INCLUDES += \
+	$(LOCAL_PATH)/../ \
 	external/tinyalsa/include \
 	external/expat/lib \
-	$(LOCAL_PATH)/../ \
 
 LOCAL_EXPORT_C_INCLUDE_DIRS := \
 	$(LOCAL_PATH) \
