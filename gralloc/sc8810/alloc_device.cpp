@@ -193,19 +193,6 @@ static int gralloc_alloc_ionbuffer_locked(alloc_device_t* dev, size_t size, int 
 
 	gralloc_module_t *module = &(m->base);
 
-	err = module->perform(module,
-				GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER,
-				fd_data.fd, ionAllocData.len,
-				0,base,
-				pHandle);
-	if(err)
-	{
-		ALOGE("perform fail");
-		munmap(base, ionAllocData.len);
-		if(is_cached) close(ion_fd);
-		return -ENOMEM;
-	}
-
 	ioctl(ion_fd, ION_IOC_FREE, &handle_data);
 
 	if(is_cached) close(ion_fd);
@@ -553,9 +540,6 @@ static int alloc_device_free(alloc_device_t* dev, buffer_handle_t handle)
 	{
 		private_module_t* m = reinterpret_cast<private_module_t*>(dev->common.module);
 		gralloc_module_t *module = &(m->base);
-		module->perform(module,
-					GRALLOC_MODULE_PERFORM_FREE_HANDLE,
-					&handle);
 		munmap((void *)hnd->base, hnd->size);
 		ALOGI("FREE hnd=%p,fd=%d,offset=0x%x,size=%d,base=%x,phys_addr=0x%x",hnd,hnd->fd,hnd->offset,hnd->size,hnd->base,hnd->phyaddr);
 		close(hnd->fd);

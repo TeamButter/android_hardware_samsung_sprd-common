@@ -25,7 +25,8 @@
 #include <hardware/hardware.h>
 #include <hardware/gralloc.h>
 
-#include "usr/include/linux/ion.h"
+// #include "usr/include/linux/ion.h"
+#include "../../kernel_headers/sc8810/ion.h"
 #include "ion_sprd.h"
 
 #include "gralloc_priv.h"
@@ -332,129 +333,6 @@ static int gralloc_unlock(gralloc_module_t const* module, buffer_handle_t handle
 	return 0;
 }
 
-int gralloc_perform(struct gralloc_module_t const* module,
-		int operation, ... )
-{
-	int res = -EINVAL;
-	va_list args;
-	va_start(args, operation);
-
-	switch (operation) {
-		case GRALLOC_MODULE_PERFORM_CREATE_HANDLE_FROM_BUFFER:
-		{
-			int fd = va_arg(args, int);
-			size_t size = va_arg(args, size_t);
-			size_t offset = va_arg(args, size_t);
-			void* base = va_arg(args, void*);
-			native_handle_t** handle = va_arg(args, native_handle_t**);
-			unsigned long phys_addr = 0;
-			ump_handle ump_h;
-
-			// it's a HACK
-			// we always return OK even the mapping is invalidate because
-			// most operation still can be done by glTexImage2D rather than
-			// purely software, the *handle will reflect the success/fail
-			// situation
-
-			private_module_t* m = (private_module_t*)(module);
-
-			if(open_ion_device(m))
-			{
-				ALOGE("open ion fail %s", __FUNCTION__);
-				break;
-			}
-	 		struct ion_phys_data phys_data;
-	 		struct ion_custom_data  custom_data;
-			phys_data.fd_buffer = fd;
-			custom_data.cmd = ION_SPRD_CUSTOM_PHYS;
-			custom_data.arg = (unsigned long)&phys_data;
-			int err = ioctl(m->mIonFd,ION_IOC_CUSTOM,&custom_data);
-			if(err){
-				break;
-			}
-	 		phys_addr = phys_data.phys;
-
-			// align offset to page
-			size_t start = phys_addr & ~4095;
-			size_t bias = phys_addr - start;
-			// align size to page
-			size = ((size + bias) + 4095) & ~4095;
-
-			ump_h = ump_handle_create_from_phys_block(start, size);
-
-			if (UMP_INVALID_MEMORY_HANDLE == ump_h) {
-				ALOGE("UMP Memory handle invalid\n");
-				break;
-			}
-			private_handle_t* hnd =
-				new private_handle_t(private_handle_t::PRIV_FLAGS_USES_UMP | private_handle_t::PRIV_FLAGS_USES_PHY,
-									size,
-									intptr_t(base) + (offset - bias),
-									private_handle_t::LOCK_STATE_MAPPED,
-									ump_secure_id_get(ump_h),
-									ump_h,
-									bias,
-									fd);
-			hnd->phyaddr = phys_addr;
-			hnd->resv0 = 0;
-			AINF("PERFORM_CREATE hnd=%p,fd=%d,offset=0x%x,size=%d,base=%p,phys_addr=0x%lx",hnd,fd,offset,size,base,phys_addr);
-			*handle = (native_handle_t *)hnd;
-			res = 0;
-			break;
-		}
-
-		case GRALLOC_MODULE_PERFORM_FREE_HANDLE:
-		{
-			native_handle_t** handle = va_arg(args, native_handle_t**);
-			private_handle_t* hnd = (private_handle_t *)*handle;
-			ump_free_handle_from_mapped_phys_block((ump_handle)hnd->ump_mem_handle);
-			res = 0;
-			break;
-		}
-
-		case GRALLOC_MODULE_PERFORM_GET_MALI_DATA:
-		{
-			ump_handle *ump_h = va_arg(args, ump_handle*);
-			native_handle_t* handle = va_arg(args, native_handle_t*);
-			private_handle_t* hnd = (private_handle_t *)handle;
-
-			if (hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) {
-				*ump_h = UMP_INVALID_MEMORY_HANDLE;
-				res = 0;
-			}
-			else if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_UMP) {
-				*ump_h = (ump_handle)hnd->ump_mem_handle;
-				res = 0;
-			}
-			else {
-				ALOGE("GRALLOC_MODULE_PERFORM_GET_MALI_DATA:"
-					 " gralloc_priv handle invalid\n");
-			}
-			break;
-		}
-
-		case GRALLOC_MODULE_GET_MALI_INTERNAL_BUF_OFF:
-		{
-			uint32_t *offset = va_arg(args, uint32_t*);
-			native_handle_t* handle = va_arg(args, native_handle_t*);
-			private_handle_t* hnd = (private_handle_t *)handle;
-			if (hnd->flags & private_handle_t::PRIV_FLAGS_USES_UMP) {
-				*offset = hnd->offset;
-				res = 0;
-			}
-			else {
-				*offset = 0;
-				ALOGE("GRALLOC_MODULE_GET_MALI_INTERNAL_BUF_OFF"
-					 " gralloc_priv handle invalid\n");
-			}
-			break;
-		}
-	}
-
-	va_end(args);
-	return res;
-}
-
 
 // There is one global instance of the module
 
@@ -481,7 +359,7 @@ private_module_t::private_module_t()
 	base.unregisterBuffer = gralloc_unregister_buffer;
 	base.lock = gralloc_lock;
 	base.unlock = gralloc_unlock;
-	base.perform = gralloc_perform;
+	base.perform = NULL;
 	INIT_ZERO(base.reserved_proc);
 
 	framebuffer = NULL;
